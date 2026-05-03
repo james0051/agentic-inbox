@@ -2,14 +2,6 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-/**
- * Email sending via Cloudflare Email Service binding.
- *
- * Uses the `send_email` Worker binding (`env.EMAIL.send()`) to send emails.
- *
- * See: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
- */
-
 export interface SendEmailParams {
 	to: string | string[];
 	from: string | { email: string; name: string };
@@ -19,54 +11,43 @@ export interface SendEmailParams {
 	cc?: string | string[];
 	bcc?: string | string[];
 	replyTo?: string | { email: string; name: string };
-	attachments?: {
-		content: string; // base64 encoded
-		filename: string;
-		type: string;
-		disposition: "attachment" | "inline";
-		contentId?: string;
-	}[];
+	attachments?: any[];
 	headers?: Record<string, string>;
 }
 
-/**
- * Send an email using the Cloudflare Email Service binding.
- *
- * @param binding  - The `EMAIL` SendEmail binding from env
- * @param params   - Email parameters (to, from, subject, body, etc.)
- * @returns The send result with messageId
- * @throws On validation or delivery errors (error has `.code` property)
- */
 export async function sendEmail(
-	binding: SendEmail,
+	env: any, // 【关键修改】：这里从 binding 改成了 env，这样才能读到 API Key
 	params: SendEmailParams,
 ): Promise<{ messageId: string }> {
-	const message: Record<string, unknown> = {
-		to: params.to,
-		from: params.from,
-		subject: params.subject,
-	};
+	
+	// 1. 格式化发件人和收件人
+	const fromAddress = typeof params.from === "string" ? params.from : params.from.email;
+	const toArray = Array.isArray(params.to) ? params.to : [params.to];
 
-	if (params.html) message.html = params.html;
-	if (params.text) message.text = params.text;
-	if (params.cc) message.cc = params.cc;
-	if (params.bcc) message.bcc = params.bcc;
-	if (params.replyTo) message.replyTo = params.replyTo;
+	// 2. 发起 Resend 请求
+	const res = await fetch('https://api.resend.com/emails', {
+		method: 'POST',
+		headers: {
+			'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			from: fromAddress, // 你的日志显示这里是 admin@aiemail.cc.cd
+			to: toArray,
+			subject: params.subject,
+			html: params.html,
+			text: params.text,
+			headers: params.headers
+		}),
+	});
 
-	if (params.headers && Object.keys(params.headers).length > 0) {
-		message.headers = params.headers;
+	if (!res.ok) {
+		const errorText = await res.text();
+		console.error("Resend 拦截报错:", errorText);
+		throw new Error(`Resend Error: ${errorText}`);
 	}
 
-	if (params.attachments && params.attachments.length > 0) {
-		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
-			filename: att.filename,
-			type: att.type,
-			disposition: att.disposition,
-			...(att.contentId ? { contentId: att.contentId } : {}),
-		}));
-	}
-
-	const result = await binding.send(message as any);
-	return { messageId: result.messageId };
+	const data = await res.json();
+	// 返回 Resend 生成的 messageId，如果没有则随机生成一个
+	return { messageId: (data as any).id || crypto.randomUUID() };
 }
