@@ -25,6 +25,13 @@ export async function sendEmail(
 	const toArray = Array.isArray(params.to) ? params.to : [params.to];
 
 	// 2. 发起 Resend 请求
+	// 加上这两行用来排错的日志
+	console.log("--- 环境变量诊断 ---");
+	console.log("Key 是否存在？", !!env.RESEND_API_KEY);
+	console.log("Key 的前缀是：", env.RESEND_API_KEY ? env.RESEND_API_KEY.substring(0, 5) : "获取失败！是空的！");
+	
+	// 下面是你原来的发信代码
+	const res = await fetch('https://api.resend.com/emails', {
 	const res = await fetch('https://api.resend.com/emails', {
 		method: 'POST',
 		headers: {
