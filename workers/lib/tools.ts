@@ -433,14 +433,27 @@ export async function toolSendReply(
 	});
 	const fullBodyHtml = sanitizedBody + quotedBlock;
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: fullBodyHtml,
-			headers: buildThreadingHeaders(originalMsgId, references),
+try {
+		const res = await fetch('https://api.resend.com/emails', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				from: mailboxId, 
+				to: [params.to],
+				subject: params.subject,
+				html: fullBodyHtml,
+				// 保留邮件的 Header，这样回复的邮件才会和原邮件在一个 Thread 里
+				headers: buildThreadingHeaders(originalMsgId, references), 
+			}),
 		});
+
+		if (!res.ok) {
+			const errorText = await res.text();
+			throw new Error(`Resend Error: ${errorText}`);
+		}
 	} catch (e) {
 		console.error("Email send failed:", (e as Error).message);
 		return { error: `Failed to send reply: ${(e as Error).message}` };
