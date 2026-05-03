@@ -498,13 +498,28 @@ export async function toolSendEmail(
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: sanitizedBody,
+try {
+		// 替换为 Resend 的发送逻辑
+		const res = await fetch('https://api.resend.com/emails', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				// 注意：如果 mailboxId 的域名没在 Resend 验证过会报错。
+				// 你可以直接在这里写死，比如 from: "Agentic Inbox <admin@你的域名.com>"
+				from: mailboxId, 
+				to: [params.to],
+				subject: params.subject,
+				html: sanitizedBody,
+			}),
 		});
+
+		if (!res.ok) {
+			const errorText = await res.text();
+			throw new Error(`Resend Error: ${errorText}`);
+		}
 	} catch (e) {
 		console.error("Email send failed:", (e as Error).message);
 		return { error: `Failed to send email: ${(e as Error).message}` };
