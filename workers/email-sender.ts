@@ -16,7 +16,7 @@ export interface SendEmailParams {
 }
 
 export async function sendEmail(
-	env: any, // 【关键修改】：这里从 binding 改成了 env，这样才能读到 API Key
+	env: any, 
 	params: SendEmailParams,
 ): Promise<{ messageId: string }> {
 	
@@ -24,14 +24,13 @@ export async function sendEmail(
 	const fromAddress = typeof params.from === "string" ? params.from : params.from.email;
 	const toArray = Array.isArray(params.to) ? params.to : [params.to];
 
-	// 2. 发起 Resend 请求
-	// 加上这两行用来排错的日志
+	// --- 加上这两行用来排错的日志 ---
 	console.log("--- 环境变量诊断 ---");
 	console.log("Key 是否存在？", !!env.RESEND_API_KEY);
 	console.log("Key 的前缀是：", env.RESEND_API_KEY ? env.RESEND_API_KEY.substring(0, 5) : "获取失败！是空的！");
-	
-	// 下面是你原来的发信代码
-	const res = await fetch('https://api.resend.com/emails', {
+	// ---------------------------------
+
+	// 2. 发起 Resend 请求
 	const res = await fetch('https://api.resend.com/emails', {
 		method: 'POST',
 		headers: {
@@ -39,7 +38,7 @@ export async function sendEmail(
 			'Content-Type': 'application/json',
 		},
 		body: JSON.stringify({
-			from: fromAddress, // 你的日志显示这里是 admin@aiemail.cc.cd
+			from: fromAddress, 
 			to: toArray,
 			subject: params.subject,
 			html: params.html,
